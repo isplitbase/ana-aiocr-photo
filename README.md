@@ -2,6 +2,7 @@
 
 写真撮影された決算書PDF (photo_pdf) を Claude API で OCR し、既存 Analygent の JSON 形式 (`{"list":[...]}`) に変換して返す Cloud Run サービス。
 
+
 判定で `text_pdf` / `scan_pdf` と認識されたものは既存 Analygent (Gemini/GPT) で処理すべきと返却するだけで、本サービスは API を叩かない。
 
 ---
