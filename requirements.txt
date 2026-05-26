@@ -1,0 +1,17 @@
+# --- Cloud Run / API 層 ---
+fastapi
+uvicorn[standard]
+python-dotenv
+google-cloud-storage
+
+# --- LLM ---
+anthropic
+
+# --- AI-OCR 本体が要求する依存 ---
+Pillow
+pydantic>=2.0
+tenacity
+opencv-python-headless
+numpy
+pdf2image
+pypdfium2
