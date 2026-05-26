@@ -42,9 +42,10 @@ def pipeline(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
         ],
         "file_period": "今期",
         "file_date":   "2026-03-31",
-        "model":       "claude-haiku-4-5-20251001",
-        "max_side":    1400,
-        "dpi":         200
+        "model":       "claude-opus-4-7",    // 既定: claude-opus-4-7 (Haiku に戻す場合は明示)
+        "max_side":    null,                  // 省略時はモデル別の自動値 (Haiku/Sonnet=1568, Opus=2576)
+        "dpi":         200,
+        "render_dpi":  300                    // 描画DPI (オーバーサンプル用, 既定 300)
       }
 
     レスポンス例:

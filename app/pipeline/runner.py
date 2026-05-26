@@ -57,7 +57,7 @@ if str(_PIPELINE_DIR) not in sys.path:
 
 from src.pdf_classifier_v3 import PDFKind, classify_pdf  # noqa: E402
 from src.pdf_io import cap_resolution  # noqa: E402
-from src.pdf_io_adaptive import load_as_pages_adaptive  # noqa: E402
+from src.pdf_io_adaptive2 import load_as_pages_adaptive, native_long_side_for_model  # noqa: E402
 from src.pipeline_kintou_v7 import PipelineKintouV7  # noqa: E402
 from src.pipeline_v2 import PipelineConfig  # noqa: E402
 from src.preprocess_v3 import run_default as run_v3  # noqa: E402
@@ -154,8 +154,14 @@ def _normalize_pdf_inputs(payload: Dict[str, Any], work_dir: Path) -> List[Dict[
 # AI-OCR 実行
 # ===========================================================================
 
-def _ocr_photo_pdf(pdf_path, *, model, max_side, dpi):
-    """photo_pdf を Claude v7 で全ページOCR. (page_results, cost) を返す."""
+def _ocr_photo_pdf(pdf_path, *, model, max_side, dpi, render_dpi=300):
+    """photo_pdf を Claude v7 で全ページOCR. (page_results, cost) を返す.
+
+    解像度方針 (2026-05-26 修正):
+      - 送信長辺 = モデルのネイティブ解像度 (Haiku/Sonnet=1568, Opus=2576)。
+        それ以上送ってもAPI側で縮小されOCRに寄与しない。
+      - 描画は render_dpi(=300) でオーバーサンプル → LANCZOSで送信長辺へ鮮明縮小。
+    """
     cfg = PipelineConfig(
         provider="claude",
         model=model,
@@ -169,7 +175,10 @@ def _ocr_photo_pdf(pdf_path, *, model, max_side, dpi):
     )
     pipeline = PipelineKintouV7(cfg)
 
-    imgs = load_as_pages_adaptive(pdf_path, target_long_side=max_side)
+    # 高DPIオーバーサンプル → 送信長辺 max_side へ鮮明縮小
+    # (5MB制限はsrc/llm/base.py・claude.py側でJPEG/縮小フォールバック)
+    imgs = load_as_pages_adaptive(
+        pdf_path, target_long_side=max_side, render_dpi=render_dpi)
     page_results = []
     total_cost = 0.0
     for pi in range(1, len(imgs) + 1):
@@ -182,7 +191,8 @@ def _ocr_photo_pdf(pdf_path, *, model, max_side, dpi):
     return page_results, total_cost
 
 
-def _process_one(pdf_info, *, model, max_side, dpi, file_period, file_date, classify_only):
+def _process_one(pdf_info, *, model, max_side, dpi, render_dpi,
+                 file_period, file_date, classify_only):
     pdf_path = Path(pdf_info["local_path"])
     rep = classify_pdf(pdf_path)
     result = {
@@ -205,6 +215,7 @@ def _process_one(pdf_info, *, model, max_side, dpi, file_period, file_date, clas
             model=model,
             max_side=max_side,
             dpi=dpi,
+            render_dpi=render_dpi,
         )
         analygent = convert_v6_to_analygent(
             page_results,
@@ -235,10 +246,24 @@ def _process_one(pdf_info, *, model, max_side, dpi, file_period, file_date, clas
 # ===========================================================================
 
 def _common_params(payload):
+    # デフォルトモデルは Opus 4.7 (2026-05-26 変更)。
+    # CLAUDE_MODEL 環境変数で全体を Haiku 等に切替可能。
+    model = (
+        payload.get("model")
+        or os.getenv("CLAUDE_MODEL")
+        or "claude-opus-4-7"
+    )
+    # max_side が指定されていなければモデルのネイティブ解像度を採用
+    # (Haiku/Sonnet=1568, Opus=2576)。それ以上送ってもAPI側で縮小されるため。
+    if payload.get("max_side"):
+        max_side = int(payload["max_side"])
+    else:
+        max_side = native_long_side_for_model(model)
     return {
-        "model": payload.get("model") or os.getenv("CLAUDE_MODEL") or "claude-haiku-4-5-20251001",
-        "max_side": int(payload.get("max_side") or 1400),
+        "model": model,
+        "max_side": max_side,
         "dpi": int(payload.get("dpi") or 200),
+        "render_dpi": int(payload.get("render_dpi") or 300),
         "file_period": payload.get("file_period"),
         "file_date": payload.get("file_date"),
     }
