@@ -9,6 +9,7 @@ from typing import Optional
 from PIL import Image
 
 from .base import LLMClient, LLMResponse
+from .model_resolver import resolve_model
 
 DEFAULT_MODEL = "gpt-4o"
 
@@ -32,6 +33,7 @@ class OpenAIClient(LLMClient):
         self._OpenAI = OpenAI
         self._model = model or DEFAULT_MODEL
         self._client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
+        self._model = resolve_model("openai", self._model, client=self._client)
 
     def extract(
         self,

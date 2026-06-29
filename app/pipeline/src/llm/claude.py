@@ -17,6 +17,7 @@ from typing import Optional
 from PIL import Image
 
 from .base import LLMClient, LLMResponse
+from .model_resolver import resolve_model
 
 DEFAULT_MODEL = "claude-sonnet-4-5"
 
@@ -52,6 +53,7 @@ class ClaudeClient(LLMClient):
         self._client = anthropic.Anthropic(
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
         )
+        self._model = resolve_model("claude", self._model, client=self._client)
 
     def extract(
         self,

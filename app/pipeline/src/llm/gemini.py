@@ -8,6 +8,7 @@ from typing import Optional
 from PIL import Image
 
 from .base import LLMClient, LLMResponse
+from .model_resolver import resolve_model
 
 DEFAULT_MODEL = "gemini-2.0-flash"
 
@@ -33,6 +34,7 @@ class GeminiClient(LLMClient):
         self._genai = genai
         self._model = model or DEFAULT_MODEL
         self._client = genai.Client(api_key=api_key or os.environ.get("GOOGLE_API_KEY"))
+        self._model = resolve_model("gemini", self._model, client=self._client)
 
     def extract(
         self,
